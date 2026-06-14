@@ -1,0 +1,91 @@
+name: Build DSpico firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_ref:
+        description: "Git ref for LNH-team/dspico-firmware"
+        default: "develop"
+        required: false
+      bootloader_ref:
+        description: "Git ref for LNH-team/dspico-bootloader"
+        default: "develop"
+        required: false
+      dldi_ref:
+        description: "Git ref for LNH-team/dspico-dldi"
+        default: "develop"
+        required: false
+      encryptor_ref:
+        description: "Git ref for Gericom/DSRomEncryptor"
+        default: "develop"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dspico-firmware-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build DSpico.uf2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      FIRMWARE_REF: ${{ inputs.firmware_ref }}
+      BOOTLOADER_REF: ${{ inputs.bootloader_ref }}
+      DLDI_REF: ${{ inputs.dldi_ref }}
+      ENCRYPTOR_REF: ${{ inputs.encryptor_ref }}
+
+    steps:
+      - name: Check out workflow repository
+        uses: actions/checkout@v6
+
+      - name: Install host packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            cmake \
+            curl \
+            gcc-arm-none-eabi \
+            git \
+            libnewlib-arm-none-eabi \
+            libstdc++-arm-none-eabi-dev \
+            libstdc++-arm-none-eabi-newlib
+
+      - name: Install .NET 9 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Install BlocksDS
+        run: |
+          sudo mkdir -p /opt/wonderful
+          sudo chown -R "$USER" /opt/wonderful
+          curl -fsSL https://wonderful.asie.pl/bootstrap/wf-bootstrap-x86_64.tar.gz \
+            | tar xz -C /opt/wonderful
+          export PATH="/opt/wonderful/bin:${PATH}"
+          wf-pacman -Syu --noconfirm wf-tools
+          wf-config repo enable blocksds
+          wf-pacman -Syu --noconfirm
+          wf-pacman -S --noconfirm blocksds-toolchain
+
+      - name: Build firmware
+        env:
+          NTR_BLOWFISH_B64: ${{ secrets.NTR_BLOWFISH_B64 }}
+          TWL_BLOWFISH_B64: ${{ secrets.TWL_BLOWFISH_B64 }}
+        run: bash .github/scripts/build-dspico-firmware.sh
+
+      - name: Upload UF2
+        uses: actions/upload-artifact@v6
+        with:
+          name: DSpico.uf2
+          path: DSpico.uf2
+          if-no-files-found: error
+          retention-days: 30
