@@ -19,6 +19,15 @@ on:
         description: "Git ref for Gericom/DSRomEncryptor"
         default: "develop"
         required: false
+      enable_wrfuxxed:
+        description: "Build firmware with Wrfuxxed support"
+        default: false
+        required: false
+        type: boolean
+      wrfuxxed_ref:
+        description: "Git ref for LNH-team/dspico-wrfuxxed"
+        default: "develop"
+        required: false
 
 permissions:
   contents: read
@@ -40,6 +49,8 @@ jobs:
       BOOTLOADER_REF: ${{ inputs.bootloader_ref }}
       DLDI_REF: ${{ inputs.dldi_ref }}
       ENCRYPTOR_REF: ${{ inputs.encryptor_ref }}
+      ENABLE_WRFUXXED: ${{ inputs.enable_wrfuxxed }}
+      WRFUXXED_REF: ${{ inputs.wrfuxxed_ref }}
 
     steps:
       - name: Check out workflow repository
@@ -77,15 +88,16 @@ jobs:
           wf-pacman -S --noconfirm blocksds-toolchain
 
       - name: Build firmware
-        env:
-          NTR_BLOWFISH_B64: ${{ secrets.NTR_BLOWFISH_B64 }}
-          TWL_BLOWFISH_B64: ${{ secrets.TWL_BLOWFISH_B64 }}
         run: bash .github/scripts/build-dspico-firmware.sh
+
+      - name: Rename UF2 if Wrfuxxed is enabled
+        if: ${{ inputs.enable_wrfuxxed }}
+        run: mv DSpico.uf2 DSpico-wrfuxxed.uf2
 
       - name: Upload UF2
         uses: actions/upload-artifact@v6
         with:
-          name: DSpico.uf2
-          path: DSpico.uf2
+          name: ${{ inputs.enable_wrfuxxed && 'DSpico-wrfuxxed.uf2' || 'DSpico.uf2' }}
+          path: ${{ inputs.enable_wrfuxxed && 'DSpico-wrfuxxed.uf2' || 'DSpico.uf2' }}
           if-no-files-found: error
           retention-days: 30

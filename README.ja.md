@@ -2,39 +2,54 @@
 
 [English](README.md)
 
-このリポジトリは、GitHub Actions で `DSpico.uf2` をビルドするための
-workflow を提供します。
+このリポジトリは、GitHub Actions で `DSpico.uf2` をビルドするための workflow を提供します。
 
 workflow は生成した firmware を GitHub Actions artifact としてアップロードします。
-個人用にビルドする場合は、この template から private repository を作成して実行してください。
+この template から private repository を作成して実行してください。
 
 ## クイックスタート
 
 1. この template から private repository を作成する
-2. `ntrBlowfish.bin` と `twlBlowfish.bin` を用意する
+2. `files/ntrBlowfish.bin` と `files/twlBlowfish.bin` を追加する
 3. 両方の SHA-1 が期待値と一致することを確認する
-4. 両方のファイルを base64 化する
-5. base64 文字列を GitHub Actions secrets に追加する
-6. `Actions` タブから `Build DSpico firmware` を実行する
-7. workflow artifact から `DSpico.uf2` をダウンロードする
+4. private repository に commit / push する
+5. `Actions` タブから `Build DSpico firmware` を実行する
+6. workflow artifact から UF2 file をダウンロードする
+
+Wrfuxxed 対応 firmware をビルドする場合は、workflow の `enable_wrfuxxed`
+option を有効にし、下記の v0.60 WRFU ROM も追加してください。
 
 ## 必要なファイル
 
-| Secret | 元ファイル | SHA-1 |
+| File | 説明 | SHA-1 |
 | --- | --- | --- |
-| `NTR_BLOWFISH_B64` | `ntrBlowfish.bin` | `84E467F2485078E401A17A5F231E3FE6E9686648` |
-| `TWL_BLOWFISH_B64` | `twlBlowfish.bin` | `2DEA11191F28C6CC1956DADB8941AFFD4B2B5102` |
+| `files/ntrBlowfish.bin` | NTR blowfish table | `84E467F2485078E401A17A5F231E3FE6E9686648` |
+| `files/twlBlowfish.bin` | TWL blowfish table | `2DEA11191F28C6CC1956DADB8941AFFD4B2B5102` |
+
+## Optional Wrfuxxed ビルド
+
+workflow は Wrfuxxed をビルドして firmware に含めることもできます。
+`enable_wrfuxxed` を有効にする前に、v0.60 WRFU ROM を `files/` に追加してください。
+
+通常ビルドの artifact には `DSpico.uf2` が含まれます。`enable_wrfuxxed` を
+有効にすると、artifact 名と解凍後の UF2 file 名は `DSpico-wrfuxxed.uf2` になります。
+
+| File | 説明 | SHA-1 |
+| --- | --- | --- |
+| `files/WRFUTester_v0.60_20080821.srl` | v0.60 WRFU ROM | `2D65FB7A0C62A4F08954B98C95F42B804FCCFD26` |
 
 ## BIOS dumps から抽出する
 
 `biosnds7.rom` と `biosdsi7.rom` がある場合は、次のコマンドで blowfish tables を
-抽出できます。macOS、Linux、WSL、Git Bash などの Bash で実行してください。
+抽出できます。`files/` に配置し、macOS、Linux、WSL、Git Bash などの Bash で実行してください。
 
 ```bash
-dd if=biosnds7.rom of=ntrBlowfish.bin \
+mkdir -p files
+
+dd if=files/biosnds7.rom of=files/ntrBlowfish.bin \
   bs=1 skip=$((0x30)) count=$((0x1048)) status=progress
 
-dd if=biosdsi7.rom of=twlBlowfish.bin \
+dd if=files/biosdsi7.rom of=files/twlBlowfish.bin \
   bs=1 skip=$((0xC6D0)) count=$((0x1048)) status=progress
 ```
 
@@ -43,60 +58,52 @@ dd if=biosdsi7.rom of=twlBlowfish.bin \
 Windows PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA1 ntrBlowfish.bin
-Get-FileHash -Algorithm SHA1 twlBlowfish.bin
+Get-FileHash -Algorithm SHA1 files\ntrBlowfish.bin
+Get-FileHash -Algorithm SHA1 files\twlBlowfish.bin
 ```
 
 macOS:
 
 ```bash
-shasum -a 1 ntrBlowfish.bin
-shasum -a 1 twlBlowfish.bin
+shasum -a 1 files/ntrBlowfish.bin
+shasum -a 1 files/twlBlowfish.bin
 ```
 
 Linux:
 
 ```bash
-sha1sum ntrBlowfish.bin
-sha1sum twlBlowfish.bin
+sha1sum files/ntrBlowfish.bin
+sha1sum files/twlBlowfish.bin
 ```
 
-## base64 化
+Wrfuxxed ビルドの場合は、v0.60 WRFU ROM も確認してください。
 
 Windows PowerShell:
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("ntrBlowfish.bin"))
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("twlBlowfish.bin"))
+Get-FileHash -Algorithm SHA1 files\WRFUTester_v0.60_20080821.srl
 ```
 
 macOS:
 
 ```bash
-base64 -i ntrBlowfish.bin | tr -d '\n'
-base64 -i twlBlowfish.bin | tr -d '\n'
+shasum -a 1 files/WRFUTester_v0.60_20080821.srl
 ```
 
 Linux:
 
 ```bash
-base64 -w 0 ntrBlowfish.bin
-base64 -w 0 twlBlowfish.bin
+sha1sum files/WRFUTester_v0.60_20080821.srl
 ```
 
-## GitHub Actions secrets に追加する
+## ファイルを commit する
 
-1. GitHub で private repository を開く
-2. `Settings` を開く
-3. `Secrets and variables` -> `Actions` を開く
-4. `New repository secret` を押す
-5. `NTR_BLOWFISH_B64` を追加し、`ntrBlowfish.bin` の base64 出力を貼り付ける
-6. `TWL_BLOWFISH_B64` を追加し、`twlBlowfish.bin` の base64 出力を貼り付ける
+この template から作成した private repository に入力ファイルを commit します。
 
 ## ライセンス
 
 この template repository に含まれる workflow と scripts は 0BSD License です。
 
 このライセンスは、DSpico firmware、DSpico bootloader、DSpico DLDI、
-DSRomEncryptor、生成される firmware artifact、利用者が用意する BIOS 由来ファイルには
+DSRomEncryptor、生成される firmware artifact、利用者が用意する入力ファイルには
 適用されません。それぞれの upstream license と権利に従ってください。

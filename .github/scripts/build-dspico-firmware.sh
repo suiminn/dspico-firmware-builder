@@ -14,17 +14,16 @@ clone_repo() {
   git clone --depth 1 --branch "$ref" "$repo_url" "$destination"
 }
 
-write_base64_secret() {
-  local secret_value="$1"
+install_required_file() {
+  local source="$1"
   local destination="$2"
-  local secret_name="$3"
+  local label="$3"
 
-  if [ -z "$secret_value" ]; then
-    fail "Missing GitHub Secret ${secret_name}. Store the required binary as base64."
+  if [ ! -s "$source" ]; then
+    fail "Missing ${label}: ${source}."
   fi
 
-  printf '%s' "$secret_value" | base64 --decode > "$destination" \
-    || fail "Could not decode ${secret_name}."
+  cp "$source" "$destination" || fail "Could not install ${label}."
 }
 
 assert_sha1() {
@@ -39,10 +38,42 @@ assert_sha1() {
   fi
 }
 
+is_true() {
+  local value
+
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    1 | true | yes | on)
+      return 0
+      ;;
+    0 | false | no | off | "")
+      return 1
+      ;;
+    *)
+      fail "Invalid boolean value: $1"
+      ;;
+  esac
+}
+
+enable_wrfuxxed_macro() {
+  local cmake_lists="$1"
+
+  if grep -Eq '^[[:space:]]*DSPICO_ENABLE_WRFUXXED([[:space:]]|#|$)' "$cmake_lists"; then
+    return
+  fi
+
+  if grep -Eq '^[[:space:]]*#[[:space:]]*DSPICO_ENABLE_WRFUXXED([[:space:]]|#|$)' "$cmake_lists"; then
+    perl -i -pe 's/^([ \t]*)#[ \t]*(DSPICO_ENABLE_WRFUXXED(?=[ \t#]|$))/$1$2/' "$cmake_lists"
+    return
+  fi
+
+  fail "Could not find DSPICO_ENABLE_WRFUXXED in ${cmake_lists}."
+}
+
 export PATH="/opt/wonderful/bin:${PATH}"
 if [ -f /opt/wonderful/bin/wf-env ]; then
-  # shellcheck disable=SC1091
   set +u
+  # shellcheck disable=SC1091
   source /opt/wonderful/bin/wf-env
   set -u
 fi
@@ -51,12 +82,21 @@ fi
 : "${BOOTLOADER_REF:=develop}"
 : "${DLDI_REF:=develop}"
 : "${ENCRYPTOR_REF:=develop}"
+: "${ENABLE_WRFUXXED:=false}"
+: "${WRFUXXED_REF:=develop}"
 
+WORKFLOW_DIR="${GITHUB_WORKSPACE:-$PWD}"
+INPUT_DIR="${INPUT_DIR:-${WORKFLOW_DIR}/files}"
 BUILD_ROOT="${BUILD_ROOT:-${RUNNER_TEMP:-$PWD}/dspico-build}"
 DLDI_DIR="${BUILD_ROOT}/dspico-dldi"
 BOOTLOADER_DIR="${BUILD_ROOT}/dspico-bootloader"
 ENCRYPTOR_SRC_DIR="${BUILD_ROOT}/DSRomEncryptor"
 FIRMWARE_DIR="${BUILD_ROOT}/dspico-firmware"
+WRFUXXED_DIR="${BUILD_ROOT}/dspico-wrfuxxed"
+WRFU_TESTER_SHA1="2D65FB7A0C62A4F08954B98C95F42B804FCCFD26"
+NTR_BLOWFISH_FILE="${NTR_BLOWFISH_FILE:-${INPUT_DIR}/ntrBlowfish.bin}"
+TWL_BLOWFISH_FILE="${TWL_BLOWFISH_FILE:-${INPUT_DIR}/twlBlowfish.bin}"
+WRFU_TESTER_FILE="${WRFU_TESTER_FILE:-${INPUT_DIR}/WRFUTester_v0.60_20080821.srl}"
 
 case "$BUILD_ROOT" in
   "" | "/" | "$PWD")
@@ -72,6 +112,9 @@ clone_repo "https://github.com/LNH-team/dspico-dldi.git" "$DLDI_REF" "$DLDI_DIR"
 clone_repo "https://github.com/LNH-team/dspico-bootloader.git" "$BOOTLOADER_REF" "$BOOTLOADER_DIR"
 clone_repo "https://github.com/Gericom/DSRomEncryptor.git" "$ENCRYPTOR_REF" "$ENCRYPTOR_SRC_DIR"
 clone_repo "https://github.com/LNH-team/dspico-firmware.git" "$FIRMWARE_REF" "$FIRMWARE_DIR"
+if is_true "$ENABLE_WRFUXXED"; then
+  clone_repo "https://github.com/LNH-team/dspico-wrfuxxed.git" "$WRFUXXED_REF" "$WRFUXXED_DIR"
+fi
 echo "::endgroup::"
 
 echo "::group::Initialize submodules"
@@ -115,10 +158,10 @@ fi
 echo "::endgroup::"
 
 echo "::group::Install DSRomEncryptor key sources"
-write_base64_secret "${NTR_BLOWFISH_B64:-}" "${ENCRYPTOR_BIN_DIR}/ntrBlowfish.bin" "NTR_BLOWFISH_B64"
-write_base64_secret "${TWL_BLOWFISH_B64:-}" "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "TWL_BLOWFISH_B64"
-assert_sha1 "${ENCRYPTOR_BIN_DIR}/ntrBlowfish.bin" "84E467F2485078E401A17A5F231E3FE6E9686648" "NTR_BLOWFISH_B64"
-assert_sha1 "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "2DEA11191F28C6CC1956DADB8941AFFD4B2B5102" "TWL_BLOWFISH_B64"
+install_required_file "$NTR_BLOWFISH_FILE" "${ENCRYPTOR_BIN_DIR}/ntrBlowfish.bin" "ntrBlowfish.bin"
+install_required_file "$TWL_BLOWFISH_FILE" "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "twlBlowfish.bin"
+assert_sha1 "${ENCRYPTOR_BIN_DIR}/ntrBlowfish.bin" "84E467F2485078E401A17A5F231E3FE6E9686648" "ntrBlowfish.bin"
+assert_sha1 "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "2DEA11191F28C6CC1956DADB8941AFFD4B2B5102" "twlBlowfish.bin"
 echo "::endgroup::"
 
 echo "::group::Create firmware ROM"
@@ -128,6 +171,23 @@ if [ ! -s "${FIRMWARE_DIR}/roms/default.nds" ]; then
   fail "default.nds was not produced."
 fi
 echo "::endgroup::"
+
+if is_true "$ENABLE_WRFUXXED"; then
+  echo "::group::Build and install Wrfuxxed"
+  make -C "$WRFUXXED_DIR"
+  WRFUXXED_PAYLOAD="$(find "$WRFUXXED_DIR" -type f -name 'uartBufv060.bin' -print -quit)"
+  if [ -z "$WRFUXXED_PAYLOAD" ]; then
+    fail "uartBufv060.bin was not produced."
+  fi
+  "$DLDITOOL" "$DLDI_FILE" "$WRFUXXED_PAYLOAD"
+
+  mkdir -p "${FIRMWARE_DIR}/data" "${FIRMWARE_DIR}/roms"
+  cp "$WRFUXXED_PAYLOAD" "${FIRMWARE_DIR}/data/uartBufv060.bin"
+  install_required_file "$WRFU_TESTER_FILE" "${FIRMWARE_DIR}/roms/dsimode.nds" "WRFU Tester v0.60 ROM"
+  assert_sha1 "${FIRMWARE_DIR}/roms/dsimode.nds" "$WRFU_TESTER_SHA1" "WRFU Tester v0.60 ROM"
+  enable_wrfuxxed_macro "${FIRMWARE_DIR}/CMakeLists.txt"
+  echo "::endgroup::"
+fi
 
 echo "::group::Build firmware"
 ln -s "${FIRMWARE_DIR}/pico-sdk" "${BUILD_ROOT}/pico-sdk"
