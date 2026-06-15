@@ -82,6 +82,7 @@ fi
 : "${BOOTLOADER_REF:=develop}"
 : "${DLDI_REF:=develop}"
 : "${ENCRYPTOR_REF:=develop}"
+: "${ENABLE_DSIDEV:=false}"
 : "${ENABLE_WRFUXXED:=false}"
 : "${WRFUXXED_REF:=develop}"
 
@@ -94,8 +95,10 @@ ENCRYPTOR_SRC_DIR="${BUILD_ROOT}/DSRomEncryptor"
 FIRMWARE_DIR="${BUILD_ROOT}/dspico-firmware"
 WRFUXXED_DIR="${BUILD_ROOT}/dspico-wrfuxxed"
 WRFU_TESTER_SHA1="2D65FB7A0C62A4F08954B98C95F42B804FCCFD26"
+TWL_DEV_BLOWFISH_SHA1="CFF62F24444F5494001F019D505F9C51D40FC8B3"
 NTR_BLOWFISH_FILE="${NTR_BLOWFISH_FILE:-${INPUT_DIR}/ntrBlowfish.bin}"
 TWL_BLOWFISH_FILE="${TWL_BLOWFISH_FILE:-${INPUT_DIR}/twlBlowfish.bin}"
+TWL_DEV_BLOWFISH_FILE="${TWL_DEV_BLOWFISH_FILE:-${INPUT_DIR}/twlDevBlowfish.bin}"
 WRFU_TESTER_FILE="${WRFU_TESTER_FILE:-${INPUT_DIR}/WRFUTester_v0.60_20080821.srl}"
 
 case "$BUILD_ROOT" in
@@ -159,14 +162,23 @@ echo "::endgroup::"
 
 echo "::group::Install DSRomEncryptor key sources"
 install_required_file "$NTR_BLOWFISH_FILE" "${ENCRYPTOR_BIN_DIR}/ntrBlowfish.bin" "ntrBlowfish.bin"
-install_required_file "$TWL_BLOWFISH_FILE" "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "twlBlowfish.bin"
 assert_sha1 "${ENCRYPTOR_BIN_DIR}/ntrBlowfish.bin" "84E467F2485078E401A17A5F231E3FE6E9686648" "ntrBlowfish.bin"
-assert_sha1 "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "2DEA11191F28C6CC1956DADB8941AFFD4B2B5102" "twlBlowfish.bin"
+if is_true "$ENABLE_DSIDEV"; then
+  install_required_file "$TWL_DEV_BLOWFISH_FILE" "${ENCRYPTOR_BIN_DIR}/twlDevBlowfish.bin" "twlDevBlowfish.bin"
+  assert_sha1 "${ENCRYPTOR_BIN_DIR}/twlDevBlowfish.bin" "$TWL_DEV_BLOWFISH_SHA1" "twlDevBlowfish.bin"
+else
+  install_required_file "$TWL_BLOWFISH_FILE" "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "twlBlowfish.bin"
+  assert_sha1 "${ENCRYPTOR_BIN_DIR}/twlBlowfish.bin" "2DEA11191F28C6CC1956DADB8941AFFD4B2B5102" "twlBlowfish.bin"
+fi
 echo "::endgroup::"
 
 echo "::group::Create firmware ROM"
 mkdir -p "${FIRMWARE_DIR}/roms"
-dotnet "$ENCRYPTOR_DLL" "$BOOTLOADER_NDS" "${FIRMWARE_DIR}/roms/default.nds"
+encryptor_args=()
+if is_true "$ENABLE_DSIDEV"; then
+  encryptor_args+=(--dsidev)
+fi
+dotnet "$ENCRYPTOR_DLL" "${encryptor_args[@]}" "$BOOTLOADER_NDS" "${FIRMWARE_DIR}/roms/default.nds"
 if [ ! -s "${FIRMWARE_DIR}/roms/default.nds" ]; then
   fail "default.nds was not produced."
 fi

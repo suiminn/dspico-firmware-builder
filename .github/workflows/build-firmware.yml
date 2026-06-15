@@ -19,6 +19,11 @@ on:
         description: "Git ref for Gericom/DSRomEncryptor"
         default: "develop"
         required: false
+      enable_dsidev:
+        description: "Build firmware with DSRomEncryptor --dsidev"
+        default: false
+        required: false
+        type: boolean
       enable_wrfuxxed:
         description: "Build firmware with Wrfuxxed support"
         default: false
@@ -49,6 +54,7 @@ jobs:
       BOOTLOADER_REF: ${{ inputs.bootloader_ref }}
       DLDI_REF: ${{ inputs.dldi_ref }}
       ENCRYPTOR_REF: ${{ inputs.encryptor_ref }}
+      ENABLE_DSIDEV: ${{ inputs.enable_dsidev }}
       ENABLE_WRFUXXED: ${{ inputs.enable_wrfuxxed }}
       WRFUXXED_REF: ${{ inputs.wrfuxxed_ref }}
 
@@ -90,14 +96,26 @@ jobs:
       - name: Build firmware
         run: bash .github/scripts/build-dspico-firmware.sh
 
-      - name: Rename UF2 if Wrfuxxed is enabled
-        if: ${{ inputs.enable_wrfuxxed }}
-        run: mv DSpico.uf2 DSpico-wrfuxxed.uf2
+      - name: Set UF2 artifact name
+        id: uf2_artifact
+        run: |
+          uf2_name="DSpico"
+          if [ "${{ inputs.enable_dsidev }}" = "true" ]; then
+            uf2_name="${uf2_name}-dsidev"
+          fi
+          if [ "${{ inputs.enable_wrfuxxed }}" = "true" ]; then
+            uf2_name="${uf2_name}-wrfuxxed"
+          fi
+          uf2_name="${uf2_name}.uf2"
+          if [ "$uf2_name" != "DSpico.uf2" ]; then
+            mv DSpico.uf2 "$uf2_name"
+          fi
+          echo "name=$uf2_name" >> "$GITHUB_OUTPUT"
 
       - name: Upload UF2
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ inputs.enable_wrfuxxed && 'DSpico-wrfuxxed.uf2' || 'DSpico.uf2' }}
-          path: ${{ inputs.enable_wrfuxxed && 'DSpico-wrfuxxed.uf2' || 'DSpico.uf2' }}
+          name: ${{ steps.uf2_artifact.outputs.name }}
+          path: ${{ steps.uf2_artifact.outputs.name }}
           if-no-files-found: error
           retention-days: 30
