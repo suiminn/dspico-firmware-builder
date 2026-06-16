@@ -4,19 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       firmware_ref:
-        description: "Git ref for LNH-team/dspico-firmware"
+        description: "Branch, tag, or commit SHA for LNH-team/dspico-firmware"
         default: "develop"
         required: false
       bootloader_ref:
-        description: "Git ref for LNH-team/dspico-bootloader"
+        description: "Branch, tag, or commit SHA for LNH-team/dspico-bootloader"
         default: "develop"
         required: false
       dldi_ref:
-        description: "Git ref for LNH-team/dspico-dldi"
+        description: "Branch, tag, or commit SHA for LNH-team/dspico-dldi"
         default: "develop"
         required: false
       encryptor_ref:
-        description: "Git ref for Gericom/DSRomEncryptor"
+        description: "Branch, tag, or commit SHA for Gericom/DSRomEncryptor"
         default: "develop"
         required: false
       enable_dsidev:
@@ -30,7 +30,7 @@ on:
         required: false
         type: boolean
       wrfuxxed_ref:
-        description: "Git ref for LNH-team/dspico-wrfuxxed"
+        description: "Branch, tag, or commit SHA for LNH-team/dspico-wrfuxxed"
         default: "develop"
         required: false
 

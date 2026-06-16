@@ -9,10 +9,8 @@ The generated firmware is uploaded as a GitHub Actions artifact. Because the req
 ## Quick Start
 
 1. Create a private repository from this template
-1. Add `ntrBlowfish.bin` to `files/`
-1. Add one of the following files to `files/`, depending on the build target
-   - Normal build: `twlBlowfish.bin`
-   - TWL dev unit build: `twlDevBlowfish.bin`
+1. Add `ntrBlowfish.bin` and `twlBlowfish.bin` to `files/`
+   - Only add `twlDevBlowfish.bin` to `files/` if you want to build for TWL dev units
 1. To create a Wrfuxxed-supported build, also add `WRFUTester_v0.60_20080821.srl` to `files/`
 1. Confirm that the SHA-1 values of the added files match the expected values below
 1. Commit and push the files
@@ -21,8 +19,15 @@ The generated firmware is uploaded as a GitHub Actions artifact. Because the req
 1. Configure the workflow options as needed
    - TWL dev unit build: check `Build firmware with DSRomEncryptor --dsidev`
    - Wrfuxxed-supported build: check `Build firmware with Wrfuxxed support`
+   - By default, upstream repositories are checked out from `develop`, matching the DSpico guide. For reproducible builds, set each upstream ref option to a specific commit SHA.
 1. Run the workflow
 1. After the run completes, download the artifact
+
+## Upstream Refs
+
+The workflow follows the upstream DSpico guide by using `develop` for each upstream repository by default. Each ref option accepts a branch, tag, or commit SHA.
+
+For reproducible builds, set the DSpico firmware, bootloader, DLDI, DSRomEncryptor, and Wrfuxxed refs to audited commit SHAs. If Wrfuxxed support is disabled, the Wrfuxxed ref is ignored.
 
 ## Required Files
 

@@ -11,7 +11,10 @@ clone_repo() {
   local ref="$2"
   local destination="$3"
 
-  git clone --depth 1 --branch "$ref" "$repo_url" "$destination"
+  git init "$destination"
+  git -C "$destination" remote add origin "$repo_url"
+  git -C "$destination" fetch --depth 1 origin "$ref"
+  git -C "$destination" checkout --detach FETCH_HEAD
 }
 
 install_required_file() {
@@ -152,8 +155,12 @@ fi
 echo "::endgroup::"
 
 echo "::group::Build DSRomEncryptor"
-dotnet build "${ENCRYPTOR_SRC_DIR}/DSRomEncryptor.sln" --configuration Release
-ENCRYPTOR_BIN_DIR="${ENCRYPTOR_SRC_DIR}/DSRomEncryptor/bin/Release/net9.0"
+ENCRYPTOR_PROJECT="${ENCRYPTOR_SRC_DIR}/DSRomEncryptor/DSRomEncryptor.csproj"
+if [ ! -f "$ENCRYPTOR_PROJECT" ]; then
+  fail "DSRomEncryptor project file was not found."
+fi
+ENCRYPTOR_BIN_DIR="${BUILD_ROOT}/DSRomEncryptor-publish"
+dotnet publish "$ENCRYPTOR_PROJECT" --configuration Release --output "$ENCRYPTOR_BIN_DIR"
 ENCRYPTOR_DLL="${ENCRYPTOR_BIN_DIR}/DSRomEncryptor.dll"
 if [ ! -s "$ENCRYPTOR_DLL" ]; then
   fail "DSRomEncryptor.dll was not produced."

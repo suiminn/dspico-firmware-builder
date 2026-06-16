@@ -9,10 +9,8 @@
 ## クイックスタート
 
 1. このテンプレートからプライベートリポジトリを作成する
-1. `files/` に `ntrBlowfish.bin` を追加する
-1. ビルド対象に応じて、次のいずれかを `files/` に追加する
-   - 通常ビルド: `twlBlowfish.bin`
-   - TWL開発機向けビルド: `twlDevBlowfish.bin`
+1. `files/` に `ntrBlowfish.bin`, `twlBlowfish.bin` を追加する
+   - TWL開発機向けにビルドをする場合のみ `files/` に `twlDevBlowfish.bin`を追加する
 1. Wrfuxxed対応ビルドを作成する場合は、`WRFUTester_v0.60_20080821.srl` も `files/` に追加する
 1. 追加したファイルのSHA-1値が後述の期待値と一致することを確認する
 1. ファイルをコミットしてプッシュする
@@ -21,8 +19,15 @@
 1. 必要に応じてワークフローのオプションを設定する
    - TWL開発機向けビルド: `Build firmware with DSRomEncryptor --dsidev` にチェックを入れる
    - Wrfuxxed対応ビルド: `Build firmware with Wrfuxxed support` にチェックを入れる
+   - デフォルトでは、DSpicoガイドと同じく各上流リポジトリの `develop` を使用します。再現性を重視する場合は、各上流refオプションに特定のコミットSHAを指定してください。
 1. ワークフローを実行する
 1. 実行完了後、アーティファクトをダウンロードする
+
+## 上流ref
+
+ワークフローは、デフォルトでは上流のDSpicoガイドに合わせて各上流リポジトリの `develop` を使用します。各refオプションには、ブランチ、タグ、またはコミットSHAを指定できます。
+
+再現性のあるビルドにしたい場合は、DSpicoファームウェア、ブートローダー、DLDI、DSRomEncryptor、Wrfuxxedのrefを確認済みのコミットSHAに設定してください。Wrfuxxed対応を無効にしている場合、Wrfuxxedのrefは使用されません。
 
 ## 必要なファイル
 
